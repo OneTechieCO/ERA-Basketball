@@ -1,0 +1,23 @@
+{
+  "source_name": "Basketball-Reference.com",
+  "url": "https://www.basketball-reference.com/teams/CHI/1996.html",
+  "retrieved_on": "2026-11-11",
+  "season_id": "1995-96",
+  "page_season_id": "1995-96",
+  "entity_kind": "team",
+  "entity_id": 1610612741,
+  "entity_name": "Chicago Bulls",
+  "field_name": "pace",
+  "field_label": "Pace",
+  "table_id": "team_misc",
+  "labeled_cells": {
+    "player": "Team",
+    "wins": "72",
+    "losses": "10",
+    "pace": "91.1"
+  },
+  "column_definition": "Pace Factor: An estimate of possessions per 48 minutes",
+  "glossary_url": "https://www.basketball-reference.com/about/glossary.html#pace",
+  "glossary_definition": "Pace Factor (available since the 1973-74 season in the NBA); the formula is 48 * ((Tm Poss + Opp Poss) / (2 * (Tm MP / 5))). Pace factor is an estimate of the number of possessions per 48 minutes by a team.",
+  "methodology": "basketball_reference_pace_factor_possessions_per_48_minutes"
+}

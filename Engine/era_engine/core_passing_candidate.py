@@ -1,0 +1,367 @@
+"""Deterministic-seed, possession-based 5v5 statistical prototype.
+
+IMPORTANT: parameters in seed.py are illustrative, not calibrated NBA estimates.
+No real-player likenesses, NBA data, or rights-controlled datasets are bundled.
+"""
+from __future__ import annotations
+from dataclasses import dataclass
+from collections import Counter
+import math
+import random
+from typing import Any
+
+ZONES = ('rim', 'paint', 'mid', 'three')
+POINTS = {'rim': 2, 'paint': 2, 'mid': 2, 'three': 3}
+
+
+def clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+@dataclass(frozen=True)
+class Era:
+    key: str
+    pace: float  # approximate team possessions / 48 min
+    three_share: float
+    physicality: float  # 0..1 contest intensity, not a direct skill penalty
+    zone_allowed: bool
+    three_distance_factor: float = 1.0
+    shot_clock: int = 24
+    game_minutes: int = 48
+    rule_note: str = ''
+
+
+    def __post_init__(self):
+        if not 0 < self.pace < float('inf'):
+            raise ValueError('Era pace must be positive and finite')
+        if not 0 <= self.three_share <= 1:
+            raise ValueError('Three-point share must be between 0 and 1')
+        if not 0 <= self.physicality <= 1:
+            raise ValueError('Physicality must be between 0 and 1')
+        if not 0 < self.three_distance_factor < float('inf'):
+            raise ValueError('Three-point distance factor must be positive and finite')
+        if not isinstance(self.shot_clock, int) or self.shot_clock <= 0:
+            raise ValueError('Shot clock must be a positive integer')
+        if not isinstance(self.game_minutes, int) or self.game_minutes <= 0:
+            raise ValueError('Game minutes must be a positive integer')
+
+@dataclass(frozen=True)
+class Player:
+    player_id: str
+    name: str
+    origin_era: str
+    offense: int
+    defense: int
+    passing: int
+    rebounding: int
+    iq: int
+    stamina: int
+    usage: float
+    # make probabilities per zone *conditional on taking shot* at neutral context
+    shot_skills: dict[str, int]
+    # relative preferred zone weights (sum need not be 1)
+    tendencies: dict[str, float]
+    # specializations
+    steals: int = 65
+    blocks: int = 60
+    injury_resilience: int = 75
+
+
+@dataclass(frozen=True)
+class Team:
+    name: str
+    player_ids: tuple[str, ...]
+    coach_style: str = 'balanced'
+
+
+def weighted_pick(rng: random.Random, weights: dict[str, float]) -> str:
+    total = sum(max(0.0, x) for x in weights.values())
+    if total <= 0:
+        raise ValueError('Expected positive weights')
+    needle = rng.random() * total
+    for k, w in weights.items():
+        needle -= max(0.0, w)
+        if needle <= 0:
+            return k
+    return next(reversed(weights))
+
+
+def shot_weights(p: Player, era: Era, coach_style: str, adaptation: float) -> dict[str, float]:
+    """Player preference persists while opportunities shift toward the target era."""
+    baseline = {'rim': .25, 'paint': .20, 'mid': .30, 'three': .25}
+    baseline['three'] = era.three_share
+    remaining = 1.0 - era.three_share
+    for z, share in [('rim', .34), ('paint', .26), ('mid', .40)]:
+        baseline[z] = remaining * share
+    mix = clamp(.25 + .35 * adaptation, .25, .60)
+    out = {z: (1 - mix) * max(.001, p.tendencies.get(z, .01)) + mix * baseline[z] for z in ZONES}
+    if coach_style == 'perimeter':
+        out['three'] *= 1.25
+    elif coach_style == 'post':
+        out['rim'] *= 1.15
+        out['paint'] *= 1.18
+    return out
+
+
+def probability_make(p: Player, defender: Player, era: Era, zone: str, fatigue: float, adaptation: float, openness: float) -> float:
+    # Baselines are development placeholders, NOT inferred from NBA history.
+    base = {'rim': .61, 'paint': .43, 'mid': .40, 'three': .34}[zone]
+    shooting = (p.shot_skills[zone] - 75) * .004
+    contest = (defender.defense - 70) * .0018 + era.physicality * .024
+    spacing = .018 * (1 if era.zone_allowed else -1) if zone == 'rim' else 0
+    distance = -.018 * (era.three_distance_factor - 1) if zone == 'three' else 0
+    return clamp(base + shooting - contest + spacing + distance + .035 * openness - .055 * fatigue + .023 * adaptation, .05, .88)
+
+
+def risk_injury(p: Player, workload: float, fatigue: float) -> float:
+    # rare per-game event; can be replaced by calibrated injury model
+    return clamp(.003 + .006 * fatigue + .003 * workload + (75 - p.injury_resilience) * .00008, .0003, .035)
+
+
+def simulate_game(team_a: Team, team_b: Team, players: dict[str, Player], era: Era, seed: int = 7,
+                  adaptation_a: float = .0, adaptation_b: float = .0,
+                  track_events: bool = True) -> dict[str, Any]:
+    """Simulate a game; each possession ends in score, rebound sequence, turnover or foul.
+
+    AI coaching is simplified, not fully historical, and there is no 3D renderer.
+    All 5 starters play the full statistical game in this initial prototype.
+    """
+    rng = random.Random(seed)
+    if len(team_a.player_ids) != 5 or len(team_b.player_ids) != 5:
+        raise ValueError('Prototype requires exactly five players on each team')
+    if any(pid not in players for pid in list(team_a.player_ids) + list(team_b.player_ids)):
+        raise ValueError('Unknown player')
+    if len(set(team_a.player_ids)) != 5:
+        raise ValueError('Duplicate player on team A')
+    if len(set(team_b.player_ids)) != 5:
+        raise ValueError('Duplicate player on team B')
+    if set(team_a.player_ids) & set(team_b.player_ids):
+        raise ValueError('Player cannot appear on both teams')
+    stats: dict[str, Counter] = {
+        pid: Counter()
+        for pid in list(team_a.player_ids) + list(team_b.player_ids)
+    }
+    score = [0, 0]
+    events: list[dict[str, Any]] = []
+    # Approximate possessions per side with variation; explicit overtime not yet modeled.
+    poss_per_team = max(25, round(rng.gauss(era.pace, 4.0)))
+    teams = (team_a, team_b)
+    for poss_index in range(poss_per_team * 2):
+        side = poss_index % 2
+        team, opp = teams[side], teams[1-side]
+        adapt = adaptation_a if side == 0 else adaptation_b
+        mean_fatigue = clamp(poss_index / (2 * poss_per_team) * .42, 0, .42)
+        offense = [players[pid] for pid in team.player_ids]
+        defense = [players[pid] for pid in opp.player_ids]
+        while True:
+            ballhandler = rng.choices(offense, weights=[max(2, p.usage * (70 + p.iq) / 140) for p in offense])[0]
+            # Defensive assignment uses same position index, with IQ-based help.
+            defender = defense[offense.index(ballhandler)]
+            if rng.random() < clamp(.085 + (defender.steals - ballhandler.iq) * .00065 + mean_fatigue * .03, .025, .16):
+                stats[ballhandler.player_id]['tov'] += 1
+                if rng.random() < .48:
+                    stats[defender.player_id]['stl'] += 1
+                if track_events:
+                    events.append({'possession': poss_index, 'kind': 'turnover', 'offense': ballhandler.player_id, 'defender': defender.player_id})
+                break
+            # Prototype ball movement: several passes may precede a shot.
+            passer = None
+            shooter = ballhandler
+            pass_count = 0
+            max_passes = 6
+            pass_failed = False
+
+            for _ in range(max_passes):
+                # Coaching style influences ball movement.
+                style_bonus = {
+                    'perimeter': .08,
+                    'balanced': .0,
+                    'post': -.04,
+                }.get(team.coach_style, 0.0)
+
+                pass_chance = clamp(
+                    .42
+                    + (shooter.passing - 70) * .004
+                    + (shooter.iq - 70) * .002
+                    + style_bonus
+                    - pass_count * .045,
+                    .12,
+                    .82,
+                )
+
+                if rng.random() >= pass_chance:
+                    break
+
+                pool = [
+                    p for p in offense
+                    if p.player_id != shooter.player_id
+                ]
+
+                recipient = rng.choices(
+                    pool,
+                    weights=[
+                        max(1.0, p.usage * (70 + p.iq) / 140)
+                        for p in pool
+                    ],
+                )[0]
+
+                # Defense can disrupt the attempted pass.
+                passer_defender = defense[offense.index(shooter)]
+                recipient_defender = defense[offense.index(recipient)]
+
+                pass_tov_chance = clamp(
+                    .045
+                    + (70 - shooter.passing) * .001
+                    + (70 - shooter.iq) * .0005
+                    + (passer_defender.steals - 70) * .0006
+                    + (recipient_defender.defense - 70) * .0004,
+                    .01,
+                    .15,
+                )
+
+                if rng.random() < pass_tov_chance:
+                    stats[shooter.player_id]['tov'] += 1
+
+                    if rng.random() < .65:
+                        stats[recipient_defender.player_id]['stl'] += 1
+
+                    if track_events:
+                        events.append({
+                            'possession': poss_index,
+                            'kind': 'pass_turnover',
+                            'offense': shooter.player_id,
+                            'defender': recipient_defender.player_id,
+                        })
+
+                    pass_failed = True
+                    break
+
+                passer = shooter
+                shooter = recipient
+                pass_count += 1
+
+            # A failed pass ends the possession.
+            if pass_failed:
+                break
+
+            # Only the final passer may receive an assist.
+            # The existing scoring code checks for an assist.
+            defender = defense[offense.index(shooter)]
+            zone = weighted_pick(rng, shot_weights(shooter, era, team.coach_style, adapt))
+            openness = clamp((shooter.iq - defender.iq) / 55 + (passer.passing - 65) / 100 if passer else (shooter.iq - defender.iq) / 65, -.8, 1)
+            # Shooting foul simplified; no bonus, team foul counts or detailed referee decisions.
+            fouled = rng.random() < clamp(.065 + era.physicality * .045 + (defender.defense - 70) * -.0003, .035, .16)
+            if fouled:
+                stats[defender.player_id]['pf'] += 1
+                fta = 3 if zone == 'three' else 2
+                stats[shooter.player_id]['fta'] += fta
+                ft_p = clamp(.65 + (shooter.shot_skills['mid'] - 70) * .003, .40, .95)
+                made = sum(rng.random() < ft_p for _ in range(fta))
+                stats[shooter.player_id]['ftm'] += made
+                stats[shooter.player_id]['pts'] += made
+                score[side] += made
+                if track_events:
+                    events.append({'possession': poss_index, 'kind': 'shooting_foul', 'offense': shooter.player_id, 'defender': defender.player_id, 'free_throws': fta, 'ft_made': made})
+                break
+            prob = probability_make(shooter, defender, era, zone, mean_fatigue, adapt, openness)
+            made = rng.random() < prob
+            stats[shooter.player_id]['fga'] += 1
+            if zone == 'three':
+                stats[shooter.player_id]['fg3a'] += 1
+            if made:
+                stats[shooter.player_id]['fgm'] += 1
+                if zone == 'three':
+                    stats[shooter.player_id]['fg3m'] += 1
+                pts = POINTS[zone]
+                score[side] += pts
+                stats[shooter.player_id]['pts'] += pts
+                assister_id = None
+
+                if passer and rng.random() < clamp(.55 + (passer.passing - 70) * .004, .2, .88):
+                    stats[passer.player_id]['ast'] += 1
+                    assister_id = passer.player_id
+
+                if track_events:
+                    events.append({
+                        'possession': poss_index,
+                        'kind': 'made_shot',
+                        'offense': shooter.player_id,
+                        'defender': defender.player_id,
+                        'zone': zone,
+                        'points': pts,
+                        'make_probability': round(prob, 3),
+                        'assister': assister_id,
+                    })
+                break
+            else:
+                # A miss creates exactly one credited rebound (simplification); occasional block credited.
+                if rng.random() < clamp(.075 + (defender.blocks - 65) * .0015, .015, .24):
+                    stats[defender.player_id]['blk'] += 1
+                offensive_reb = rng.random() < .24
+                pool = offense if offensive_reb else defense
+                rebounder = rng.choices(pool, weights=[max(10, p.rebounding) for p in pool])[0]
+                stats[rebounder.player_id]['oreb' if offensive_reb else 'dreb'] += 1
+                stats[rebounder.player_id]['reb'] += 1
+                if track_events:
+                    events.append({'possession': poss_index, 'kind': 'miss', 'offense': shooter.player_id, 'defender': defender.player_id, 'zone': zone, 'rebounder': rebounder.player_id, 'offensive_rebound': offensive_reb})
+                if not offensive_reb:
+                    break
+
+    for pid, stat in stats.items():
+        stat['gp'] = 1
+        stat['min'] = era.game_minutes
+    return {'era': era.key, 'seed': seed, 'teams': [team_a.name, team_b.name], 'score': score,
+            'possessions_per_team': poss_per_team, 'player_stats': {pid: dict(v) for pid, v in stats.items()}, 'events': events}
+
+
+def simulate_series(team_a: Team, team_b: Team, players: dict[str, Player], era: Era,
+                    games: int = 10, seed: int = 7, adapt_over_season: bool = True) -> dict[str, Any]:
+    if not 1 <= games <= 82:
+        raise ValueError('games must be between 1 and 82')
+    totals = {pid: Counter() for pid in team_a.player_ids + team_b.player_ids}
+    per_game = []
+    highlights = []
+    for idx in range(games):
+        a = clamp(idx / 65, 0, 1) if adapt_over_season else 0
+        result = simulate_game(team_a, team_b, players, era, seed + idx * 997, a, a)
+        per_game.append({'game': idx + 1, 'score': result['score'], 'player_stats': result['player_stats']})
+        for pid, s in result['player_stats'].items():
+            totals[pid].update(s)
+        highlights.extend([{'game': idx + 1, **ev} for ev in result['events'] if ev['kind'] in ('made_shot', 'shooting_foul')][:4])
+    averages = {}
+    for pid, s in totals.items():
+        averages[pid] = {
+            **{stat: round(s[stat] / games, 3) for stat in ['pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'fga', 'fgm', 'fg3a', 'fg3m', 'fta', 'ftm', 'pf']},
+            'fg_pct': round(s['fgm'] / s['fga'], 4) if s['fga'] else None,
+            'fg3_pct': round(s['fg3m'] / s['fg3a'], 4) if s['fg3a'] else None,
+            'ft_pct': round(s['ftm'] / s['fta'], 4) if s['fta'] else None,
+        }
+    return {'model_version': '0.1.0-prototype', 'era': era.key, 'games': games, 'seed': seed,
+            'team_names': [team_a.name, team_b.name], 'averages': averages,
+            'game_results': per_game, 'highlights': highlights}
+
+
+def estimate_season(team_a: Team, team_b: Team, players: dict[str, Player], era: Era,
+                    runs: int = 60, seed: int = 7) -> dict[str, Any]:
+    """Repeat season-length simulations to estimate a numerical uncertainty interval.
+    Not a statistically validated historical confidence interval.
+    """
+    if not 2 <= runs <= 5000:
+        raise ValueError('runs must be between 2 and 5000')
+    targets = {pid: [] for pid in team_a.player_ids + team_b.player_ids}
+    for index in range(runs):
+        result = simulate_series(team_a, team_b, players, era, games=82,
+                                 seed=seed + index * 100003)
+        for pid in targets:
+            targets[pid].append(result['averages'][pid]['pts'])
+    def quantile(values: list[float], q: float) -> float:
+        xs = sorted(values)
+        pos = q * (len(xs) - 1)
+        lower = int(pos)
+        frac = pos - lower
+        return xs[lower] * (1 - frac) + xs[min(lower + 1, len(xs) - 1)] * frac
+    return {'model_version': '0.1.0-prototype', 'runs': runs,
+            'note': 'Intervals describe Monte Carlo variability under assumed parameters, NOT real-world calibrated confidence.',
+            'players': {pid: {'points_per_game_mean': round(sum(xs) / len(xs), 2),
+                              'simulation_p05': round(quantile(xs, .05), 2),
+                              'simulation_p95': round(quantile(xs, .95), 2)} for pid, xs in targets.items()}}

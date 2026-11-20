@@ -1,0 +1,107 @@
+{
+  "label": "2015-16 Warriors versus the fictional Chicago Stampede, seeds 0-99. Model diagnostic, not a historical game and not a pace target.",
+  "sample": {
+    "source": "exploration shot trips",
+    "count": 471,
+    "mean": 13.353290870488323,
+    "game_ids": [
+      "0021500003",
+      "0021500290",
+      "0021500605",
+      "0021501227"
+    ],
+    "excluded": {
+      "not_a_shot_ending": 90,
+      "offensive_rebound_continuation": 75,
+      "unreliable_or_overtime": 133,
+      "longer_than_shot_clock": 33,
+      "period_end": 7
+    },
+    "reserved_used_to_build_sample": false
+  },
+  "held_out_after_the_model_was_fixed": {
+    "reserved_shot_trip_count": 488,
+    "reserved_shot_trip_mean": 12.677868852459017,
+    "validation_shot_trip_count": 495,
+    "validation_shot_trip_mean": 13.504040404040405,
+    "used_to_change_the_sample": false
+  },
+  "before_original_timing": {
+    "possessions_per_game": 139.08,
+    "possessions_per_48": 138.93377358490568,
+    "points_per_game": 155.57,
+    "points_per_48": 155.41622641509434,
+    "opponent_points_per_game": 139.42,
+    "points_per_possession": 1.1185648547598503,
+    "duration": {
+      "count": 27769,
+      "mean": 10.382080737513053,
+      "p10": 6.0,
+      "p50": 9.786677575162685,
+      "p90": 14.312150691151125
+    },
+    "buckets": {
+      "0-6": 0.10184018149735316,
+      "6-10": 0.43220857791061973,
+      "10-16": 0.4127264215492096,
+      "16-24": 0.05001980625877778,
+      "24+": 0.0032050127840397564
+    },
+    "violations_per_game": 0.0,
+    "fga_per_game": 127.99,
+    "fta_per_game": 24.66,
+    "oreb_per_game": 16.77,
+    "tov_per_game": 15.77,
+    "fg": 0.4522228299085866,
+    "three": 0.3727324804277258,
+    "ft": 0.8227899432278994,
+    "opponent_fg": 0.4315773067331671,
+    "opponent_three": 0.3284365162644281,
+    "opponent_ft": 0.6750313676286073,
+    "curry_ppg": 58.5,
+    "curry_shot_share": 0.33643253379170246,
+    "development_seconds_per_game": 0.0,
+    "setup_seconds_per_game": 1659.4813619710103,
+    "overtime_games": 1,
+    "accounting": "player points matched both team scores; live seconds matched the game clock; no negative clock"
+  },
+  "after_first_trip_residual": {
+    "possessions_per_game": 101.19,
+    "possessions_per_48": 100.97867924528302,
+    "points_per_game": 112.31,
+    "points_per_48": 112.09867924528302,
+    "opponent_points_per_game": 101.9,
+    "points_per_possession": 1.1098922818460322,
+    "duration": {
+      "count": 20184,
+      "mean": 14.29845422116528,
+      "p10": 6.0,
+      "p50": 14.0,
+      "p90": 21.40000000000009
+    },
+    "buckets": {
+      "0-6": 0.10171422909235038,
+      "6-10": 0.1348592944906857,
+      "10-16": 0.42568370986920334,
+      "16-24": 0.3109889021006738,
+      "24+": 0.0267538644470868
+    },
+    "violations_per_game": 0.0,
+    "fga_per_game": 92.51,
+    "fta_per_game": 18.22,
+    "oreb_per_game": 11.7,
+    "tov_per_game": 10.84,
+    "fg": 0.44805966922494866,
+    "three": 0.3846971307120085,
+    "ft": 0.8194291986827662,
+    "opponent_fg": 0.4333513806172171,
+    "opponent_three": 0.35592606016672707,
+    "opponent_ft": 0.6779279279279279,
+    "curry_ppg": 41.34,
+    "curry_shot_share": 0.34655712895903146,
+    "development_seconds_per_game": 797.3691283023867,
+    "setup_seconds_per_game": 1205.176353476693,
+    "overtime_games": 2,
+    "accounting": "player points matched both team scores; live seconds matched the game clock; no negative clock"
+  }
+}

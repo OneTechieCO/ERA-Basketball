@@ -1,0 +1,61 @@
+{
+  "source_name": "nba.com via nba_api",
+  "retrieved_on": "2026-11-11",
+  "retrieved_at_utc": "2026-11-11T22:18:18+00:00",
+  "play_by_play_endpoint": "playbyplayv3",
+  "game_id_endpoint": "leaguegamefinder",
+  "game_id_file": "research_playbyplay/source/leaguegamefinder_gsw_2015_16.json",
+  "role": "validation",
+  "held_out_from_original_sample": [
+    "0021500003",
+    "0021500290",
+    "0021500605",
+    "0021501227"
+  ],
+  "clock_field": "clock",
+  "shot_clock_field": null,
+  "games": [
+    {
+      "game_id": "0021500164",
+      "game_date": "2015-11-17",
+      "matchup": "GSW vs. TOR",
+      "actions": 515,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "validation"
+    },
+    {
+      "game_id": "0021500504",
+      "game_date": "2016-01-02",
+      "matchup": "GSW vs. DEN",
+      "actions": 524,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "validation"
+    },
+    {
+      "game_id": "0021500822",
+      "game_date": "2016-02-20",
+      "matchup": "GSW @ LAC",
+      "actions": 491,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "validation"
+    },
+    {
+      "game_id": "0021501112",
+      "game_date": "2016-03-29",
+      "matchup": "GSW vs. WAS",
+      "actions": 512,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "validation"
+    }
+  ],
+  "existing_season_tables_modified": false,
+  "note": "These games were not used to choose action durations."
+}

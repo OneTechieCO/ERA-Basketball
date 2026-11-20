@@ -1,0 +1,301 @@
+[
+  {
+    "era": "1995-96",
+    "seed": 0,
+    "status": "final",
+    "score": [
+      137,
+      140
+    ],
+    "regulation_score": [
+      137,
+      140
+    ],
+    "possessions": 302,
+    "possessions_by_team": [
+      151,
+      151
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 282.0,
+    "setup_live_seconds": 1522.8963855105396,
+    "live_total": 2880.0000000000005
+  },
+  {
+    "era": "1995-96",
+    "seed": 7,
+    "status": "final",
+    "score": [
+      127,
+      123
+    ],
+    "regulation_score": [
+      127,
+      123
+    ],
+    "possessions": 280,
+    "possessions_by_team": [
+      140,
+      140
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 246.0,
+    "setup_live_seconds": 1431.9149623467792,
+    "live_total": 2879.999999999999
+  },
+  {
+    "era": "1995-96",
+    "seed": 8,
+    "status": "final",
+    "score": [
+      133,
+      135
+    ],
+    "regulation_score": [
+      133,
+      135
+    ],
+    "possessions": 290,
+    "possessions_by_team": [
+      145,
+      145
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 300.0,
+    "setup_live_seconds": 1439.1309366628723,
+    "live_total": 2880.0
+  },
+  {
+    "era": "1995-96",
+    "seed": 19,
+    "status": "final",
+    "score": [
+      149,
+      186
+    ],
+    "regulation_score": [
+      149,
+      186
+    ],
+    "possessions": 299,
+    "possessions_by_team": [
+      150,
+      149
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 288.0,
+    "setup_live_seconds": 1502.8556623852908,
+    "live_total": 2880.0000000000005
+  },
+  {
+    "era": "2015-16",
+    "seed": 0,
+    "status": "final",
+    "score": [
+      145,
+      142
+    ],
+    "regulation_score": [
+      145,
+      142
+    ],
+    "possessions": 295,
+    "possessions_by_team": [
+      148,
+      147
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 306.0,
+    "setup_live_seconds": 1457.9330935590192,
+    "live_total": 2880.0
+  },
+  {
+    "era": "2015-16",
+    "seed": 7,
+    "status": "final",
+    "score": [
+      145,
+      141
+    ],
+    "regulation_score": [
+      128,
+      128
+    ],
+    "possessions": 313,
+    "possessions_by_team": [
+      157,
+      156
+    ],
+    "periods": 1,
+    "game_clock_seconds": 3180.0,
+    "stopped_inbound_shot_clock_seconds": 330.0,
+    "setup_live_seconds": 1542.184827716821,
+    "live_total": 3179.9999999999986
+  },
+  {
+    "era": "2015-16",
+    "seed": 8,
+    "status": "final",
+    "score": [
+      139,
+      171
+    ],
+    "regulation_score": [
+      139,
+      171
+    ],
+    "possessions": 289,
+    "possessions_by_team": [
+      145,
+      144
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 282.0,
+    "setup_live_seconds": 1452.0,
+    "live_total": 2880.0
+  },
+  {
+    "era": "2015-16",
+    "seed": 19,
+    "status": "final",
+    "score": [
+      169,
+      181
+    ],
+    "regulation_score": [
+      169,
+      181
+    ],
+    "possessions": 295,
+    "possessions_by_team": [
+      148,
+      147
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 258.0,
+    "setup_live_seconds": 1502.642843130654,
+    "live_total": 2880.0
+  },
+  {
+    "era": "2023-24",
+    "seed": 0,
+    "status": "final",
+    "score": [
+      134,
+      142
+    ],
+    "regulation_score": [
+      134,
+      142
+    ],
+    "possessions": 290,
+    "possessions_by_team": [
+      145,
+      145
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 264.0,
+    "setup_live_seconds": 1476.0,
+    "live_total": 2880.0000000000005
+  },
+  {
+    "era": "2023-24",
+    "seed": 7,
+    "status": "final",
+    "score": [
+      124,
+      130
+    ],
+    "regulation_score": [
+      124,
+      130
+    ],
+    "possessions": 290,
+    "possessions_by_team": [
+      145,
+      145
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 282.0,
+    "setup_live_seconds": 1458.0,
+    "live_total": 2879.9999999999986
+  },
+  {
+    "era": "2023-24",
+    "seed": 8,
+    "status": "final",
+    "score": [
+      155,
+      166
+    ],
+    "regulation_score": [
+      155,
+      166
+    ],
+    "possessions": 295,
+    "possessions_by_team": [
+      148,
+      147
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 306.0,
+    "setup_live_seconds": 1458.4918501943016,
+    "live_total": 2879.9999999999995
+  },
+  {
+    "era": "2023-24",
+    "seed": 19,
+    "status": "final",
+    "score": [
+      171,
+      185
+    ],
+    "regulation_score": [
+      171,
+      185
+    ],
+    "possessions": 295,
+    "possessions_by_team": [
+      148,
+      147
+    ],
+    "periods": 0,
+    "game_clock_seconds": 2880.0,
+    "stopped_inbound_shot_clock_seconds": 264.0,
+    "setup_live_seconds": 1496.642843130654,
+    "live_total": 2880.0000000000005
+  },
+  {
+    "era": "2015-16",
+    "seed": 7,
+    "status": "final",
+    "score": [
+      145,
+      141
+    ],
+    "regulation_score": [
+      128,
+      128
+    ],
+    "possessions": 313,
+    "possessions_by_team": [
+      157,
+      156
+    ],
+    "periods": 1,
+    "game_clock_seconds": 3180.0,
+    "stopped_inbound_shot_clock_seconds": 330.0,
+    "setup_live_seconds": 1542.184827716821,
+    "live_total": 3179.9999999999986
+  }
+]

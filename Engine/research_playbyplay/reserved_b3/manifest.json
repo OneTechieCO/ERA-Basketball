@@ -1,0 +1,67 @@
+{
+  "source_name": "nba.com via nba_api",
+  "retrieved_on": "2026-11-11",
+  "retrieved_at_utc": "2026-11-11T22:41:45+00:00",
+  "play_by_play_endpoint": "playbyplayv3",
+  "game_id_endpoint": "leaguegamefinder",
+  "game_id_file": "research_playbyplay/source/leaguegamefinder_gsw_2015_16.json",
+  "role": "reserved",
+  "used_for_b3_assessment": false,
+  "used_for_model_selection": false,
+  "held_out_from": [
+    "0021500003",
+    "0021500290",
+    "0021500605",
+    "0021501227",
+    "0021500164",
+    "0021500504",
+    "0021500822",
+    "0021501112"
+  ],
+  "clock_field": "clock",
+  "shot_clock_field": null,
+  "games": [
+    {
+      "game_id": "0021500092",
+      "game_date": "2015-11-07",
+      "matchup": "GSW @ SAC",
+      "actions": 497,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "reserved"
+    },
+    {
+      "game_id": "0021500245",
+      "game_date": "2015-11-28",
+      "matchup": "GSW vs. SAC",
+      "actions": 505,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "reserved"
+    },
+    {
+      "game_id": "0021500592",
+      "game_date": "2016-01-14",
+      "matchup": "GSW vs. LAL",
+      "actions": 496,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "reserved"
+    },
+    {
+      "game_id": "0021500943",
+      "game_date": "2016-03-07",
+      "matchup": "GSW vs. ORL",
+      "actions": 533,
+      "endpoint": "playbyplayv3",
+      "season": "2015-16",
+      "team": "GSW",
+      "role": "reserved"
+    }
+  ],
+  "existing_season_tables_modified": false,
+  "note": "Reserved before Variant B3 was assessed. Durations were not used to choose the model."
+}

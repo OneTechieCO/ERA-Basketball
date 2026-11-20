@@ -1,0 +1,27 @@
+{
+  "source_name": "Basketball-Reference.com",
+  "url": "https://www.basketball-reference.com/players/j/jordami01.html",
+  "retrieved_on": "2026-11-11",
+  "season_id": "1995-96",
+  "page_season_id": "1995-96",
+  "entity_kind": "player",
+  "entity_id": 893,
+  "entity_name": "Michael Jordan",
+  "team_id": 1610612741,
+  "field_name": "usg_pct",
+  "field_label": "USG%",
+  "table_id": "advanced",
+  "row_id": "advanced.1996",
+  "labeled_cells": {
+    "year_id": "1995-96",
+    "team_name_abbr": "CHI",
+    "games": "82",
+    "mp": "3090",
+    "usg_pct": "33.3"
+  },
+  "source_sort_key": "0.333367650000000000",
+  "column_definition": "Usage Percentage: An estimate of the percentage of team plays used by a player while they were on the floor.",
+  "glossary_url": "https://www.basketball-reference.com/about/glossary.html#usg_pct",
+  "glossary_definition": "Usage Percentage (available since the 1977-78 season in the NBA); the formula is 100 * ((FGA + 0.44 * FTA + TOV) * (Tm MP / 5)) / (MP * (Tm FGA + 0.44 * Tm FTA + Tm TOV)). Usage percentage is an estimate of the percentage of team plays used by a player while he was on the floor.",
+  "methodology": "basketball_reference_usage_percentage_on_floor_share"
+}

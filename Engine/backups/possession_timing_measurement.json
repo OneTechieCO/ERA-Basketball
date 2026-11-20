@@ -1,0 +1,577 @@
+{
+  "simulated": [
+    {
+      "team": "Chicago Bulls",
+      "season": "1995-96",
+      "opponent": "Bay City Legends",
+      "label": "Model diagnostic against a fictional opponent. Not an observed NBA game.",
+      "games": 100,
+      "possessions_per_team": {
+        "count": 100,
+        "mean": 136.17,
+        "p10": 132.0,
+        "p50": 136.0,
+        "p90": 139.0
+      },
+      "opponent_possessions": {
+        "count": 100,
+        "mean": 135.63,
+        "p10": 132.0,
+        "p50": 135.0,
+        "p90": 138.0
+      },
+      "points": {
+        "count": 100,
+        "mean": 146.44,
+        "p10": 130.9,
+        "p50": 146.5,
+        "p90": 164.0
+      },
+      "opponent_points": {
+        "count": 100,
+        "mean": 134.62,
+        "p10": 118.0,
+        "p50": 135.0,
+        "p90": 152.20000000000002
+      },
+      "elapsed_mean": 2889.0,
+      "overtime_games": 3,
+      "possessions_per_48": 135.7398113207547,
+      "points_per_48": 146.00509433962264,
+      "points_per_possession": 1.0754204303444224,
+      "duration_both_teams": {
+        "count": 27180,
+        "mean": 10.629139072847682,
+        "p10": 7.514040161619141,
+        "p50": 9.987591004377833,
+        "p90": 14.923408413795537
+      },
+      "duration_buckets": {
+        "0-6": 0.096504782928624,
+        "6-10": 0.406953642384106,
+        "10-16": 0.42858719646799115,
+        "16-24": 0.06394407652685799,
+        "24+": 0.0040103016924208975
+      },
+      "by_end": {
+        "defensive_rebound": {
+          "count": 10390,
+          "mean": 11.754742181988219,
+          "p10": 8.934593370345691,
+          "p50": 10.811487482167877,
+          "p90": 15.839267948457156
+        },
+        "made_shot": {
+          "count": 10873,
+          "mean": 10.699582500594152,
+          "p10": 7.903276516126266,
+          "p50": 9.737504964231903,
+          "p90": 14.688237174591713
+        },
+        "turnover": {
+          "count": 2514,
+          "mean": 6.634569650184126,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 8.837946171526417
+        },
+        "shooting_foul": {
+          "count": 2662,
+          "mean": 10.736248638075347,
+          "p10": 7.924872907429517,
+          "p50": 9.899792645896525,
+          "p90": 14.599119031137343
+        },
+        "pass_turnover": {
+          "count": 351,
+          "mean": 7.964546641987552,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 11.38321696369485
+        },
+        "period_expired": {
+          "count": 390,
+          "mean": 6.0946419326284715,
+          "p10": 1.2723225893266206,
+          "p50": 5.737420089805028,
+          "p90": 11.330530794435415
+        }
+      },
+      "by_start": {
+        "period_start": {
+          "count": 400,
+          "mean": 10.587071545311183,
+          "p10": 7.751462741739578,
+          "p50": 9.864999544884142,
+          "p90": 14.633827954788602
+        },
+        "live_ball": {
+          "count": 13242,
+          "mean": 10.602816840379978,
+          "p10": 7.507405663814882,
+          "p50": 9.97986964122424,
+          "p90": 14.882765743714208
+        },
+        "made_basket_inbound": {
+          "count": 10873,
+          "mean": 10.678970109110816,
+          "p10": 7.517907296722342,
+          "p50": 10.005988379397195,
+          "p90": 15.037012689780752
+        },
+        "dead_ball_inbound": {
+          "count": 2662,
+          "mean": 10.56359071432513,
+          "p10": 7.509417487172641,
+          "p50": 9.928756036831373,
+          "p90": 14.726185079886488
+        },
+        "jump_ball": {
+          "count": 3,
+          "mean": 9.983434556152739,
+          "p10": 8.511209876155773,
+          "p50": 10.205070236568645,
+          "p90": 11.367004963983344
+        }
+      },
+      "setup_by_start": {
+        "period_start": {
+          "count": 400,
+          "mean": 6.0,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "live_ball": {
+          "count": 13242,
+          "mean": 5.975630208168608,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "made_basket_inbound": {
+          "count": 10873,
+          "mean": 5.980128131535912,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "dead_ball_inbound": {
+          "count": 2662,
+          "mean": 5.9701904563624275,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "jump_ball": {
+          "count": 3,
+          "mean": 6.0,
+          "p10": 6.000000000000001,
+          "p50": 6.0,
+          "p90": 6.0
+        }
+      },
+      "start_counts": {
+        "period_start": 400,
+        "live_ball": 13242,
+        "made_basket_inbound": 10873,
+        "dead_ball_inbound": 2662,
+        "jump_ball": 3
+      },
+      "stopped_start_share": {
+        "period_start": 1.0,
+        "live_ball": 0.0,
+        "made_basket_inbound": 0.10190379839970569,
+        "dead_ball_inbound": 1.0,
+        "jump_ball": 1.0
+      },
+      "end_counts": {
+        "defensive_rebound": 10390,
+        "made_shot": 10873,
+        "turnover": 2514,
+        "shooting_foul": 2662,
+        "pass_turnover": 351,
+        "period_expired": 390
+      },
+      "historical_team_end_counts_per_game": {
+        "defensive_rebound": 50.27,
+        "made_shot": 57.61,
+        "turnover": 11.89,
+        "shooting_foul": 13.22,
+        "period_expired": 1.93,
+        "pass_turnover": 1.25
+      },
+      "live_seconds_per_game": {
+        "setup": 1624.6187538559543,
+        "completed_pass": 447.73629750137746,
+        "release": 679.323593397737,
+        "rebound_gather": 135.78409724325465,
+        "period": 1.537258001676153
+      },
+      "live_seconds_share": {
+        "setup": 0.5623464014731584,
+        "completed_pass": 0.1549796806858351,
+        "release": 0.23514143073649607,
+        "rebound_gather": 0.04700037980036506,
+        "period": 0.000532107304145432
+      },
+      "clock_gap_max_abs": 1.3642420526593924e-12,
+      "passes": {
+        "count": 27180,
+        "mean": 0.7290286975717439,
+        "p10": 0.0,
+        "p50": 0.0,
+        "p90": 2.0
+      },
+      "post_setup_seconds": {
+        "count": 27180,
+        "mean": 4.651880964474045,
+        "p10": 1.5140401616191412,
+        "p50": 3.9875910043778333,
+        "p90": 8.923408413795537
+      },
+      "zero_pass_shot_share": 0.5220898641588296,
+      "instant_turnover_share": 0.08263428991905813,
+      "pass_turnovers_per_game": 3.51,
+      "stolen_passes_with_no_added_time_per_game": 3.09,
+      "release_shot_clock_remaining_after_charge": {
+        "count": 27122,
+        "mean": 14.508135117625038,
+        "p10": 10.892793913862832,
+        "p50": 14.786904358985797,
+        "p90": 16.482562400309796
+      },
+      "period_ending_possessions_per_game": 4.03,
+      "period_ending_duration": {
+        "count": 403,
+        "mean": 6.240929836606308,
+        "p10": 1.2979537010157858,
+        "p50": 5.905272732718913,
+        "p90": 11.440463800176577
+      },
+      "shot_clock_violations_per_game": 0.0,
+      "oreb_possession_share": 0.1050036791758646,
+      "continuation_after_first_rebound_stamp": {
+        "count": 2854,
+        "mean": 4.687671038973244,
+        "p10": 1.5291732352005338,
+        "p50": 3.9777047696961745,
+        "p90": 8.905321879422955
+      },
+      "scorebook_estimate_per_game": 133.8768,
+      "engine_possessions_minus_scorebook": 2.2931999999999846,
+      "shooting": {
+        "fg": 0.4671207329927836,
+        "three": 0.35548564687377116,
+        "ft": 0.759069130732375
+      },
+      "star": {
+        "id": "NBA_893",
+        "points_per_game": 59.18,
+        "shot_share": 0.4000648666180167
+      }
+    },
+    {
+      "team": "Golden State Warriors",
+      "season": "2015-16",
+      "opponent": "Chicago Stampede",
+      "label": "Model diagnostic against a fictional opponent. Not an observed NBA game.",
+      "games": 100,
+      "possessions_per_team": {
+        "count": 100,
+        "mean": 139.08,
+        "p10": 136.0,
+        "p50": 139.0,
+        "p90": 142.0
+      },
+      "opponent_possessions": {
+        "count": 100,
+        "mean": 138.61,
+        "p10": 135.0,
+        "p50": 138.0,
+        "p90": 141.0
+      },
+      "points": {
+        "count": 100,
+        "mean": 155.57,
+        "p10": 139.70000000000002,
+        "p50": 156.5,
+        "p90": 173.1
+      },
+      "opponent_points": {
+        "count": 100,
+        "mean": 139.42,
+        "p10": 119.0,
+        "p50": 138.0,
+        "p90": 160.10000000000002
+      },
+      "elapsed_mean": 2883.0,
+      "overtime_games": 1,
+      "possessions_per_48": 138.93377358490568,
+      "points_per_48": 155.41622641509434,
+      "points_per_possession": 1.1185648547598503,
+      "duration_both_teams": {
+        "count": 27769,
+        "mean": 10.382080737513053,
+        "p10": 6.0,
+        "p50": 9.786677575162685,
+        "p90": 14.312150691151125
+      },
+      "duration_buckets": {
+        "0-6": 0.10184018149735316,
+        "6-10": 0.43220857791061973,
+        "10-16": 0.4127264215492096,
+        "16-24": 0.05001980625877778,
+        "24+": 0.0032050127840397564
+      },
+      "by_end": {
+        "defensive_rebound": {
+          "count": 10931,
+          "mean": 11.498185629809145,
+          "p10": 8.90399145731169,
+          "p50": 10.535014137797134,
+          "p90": 15.194485681913193
+        },
+        "made_shot": {
+          "count": 11326,
+          "mean": 10.454570643119498,
+          "p10": 7.89612972530233,
+          "p50": 9.48603027288803,
+          "p90": 14.061450209164605
+        },
+        "shooting_foul": {
+          "count": 2063,
+          "mean": 10.357091874099059,
+          "p10": 7.852125112661042,
+          "p50": 9.418978331622839,
+          "p90": 13.725697724916312
+        },
+        "turnover": {
+          "count": 2691,
+          "mean": 6.613592225228623,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 8.947028627452255
+        },
+        "pass_turnover": {
+          "count": 370,
+          "mean": 7.608210185215002,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 10.11196358896396
+        },
+        "period_expired": {
+          "count": 388,
+          "mean": 5.73703812808936,
+          "p10": 0.9592438565787689,
+          "p50": 5.17692387191039,
+          "p90": 11.23330008171465
+        }
+      },
+      "by_start": {
+        "period_start": {
+          "count": 400,
+          "mean": 10.226675892088839,
+          "p10": 6.0,
+          "p50": 9.684637438996845,
+          "p90": 13.653934984028911
+        },
+        "live_ball": {
+          "count": 13979,
+          "mean": 10.393198212268556,
+          "p10": 6.439735071654753,
+          "p50": 9.797385055279733,
+          "p90": 14.324510470487349
+        },
+        "made_basket_inbound": {
+          "count": 11326,
+          "mean": 10.38800656362579,
+          "p10": 6.0,
+          "p50": 9.8041624049431,
+          "p90": 14.318945928151635
+        },
+        "dead_ball_inbound": {
+          "count": 2063,
+          "mean": 10.306470913347846,
+          "p10": 6.0,
+          "p50": 9.666381869968063,
+          "p90": 14.206693458656353
+        },
+        "jump_ball": {
+          "count": 1,
+          "mean": 6.0,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        }
+      },
+      "setup_by_start": {
+        "period_start": {
+          "count": 400,
+          "mean": 6.0,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "live_ball": {
+          "count": 13979,
+          "mean": 5.975288204540316,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "made_basket_inbound": {
+          "count": 11326,
+          "mean": 5.975580645296952,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "dead_ball_inbound": {
+          "count": 2063,
+          "mean": 5.978747453804534,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        },
+        "jump_ball": {
+          "count": 1,
+          "mean": 6.0,
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0
+        }
+      },
+      "start_counts": {
+        "period_start": 400,
+        "live_ball": 13979,
+        "made_basket_inbound": 11326,
+        "dead_ball_inbound": 2063,
+        "jump_ball": 1
+      },
+      "stopped_start_share": {
+        "period_start": 1.0,
+        "live_ball": 0.0,
+        "made_basket_inbound": 0.10294896697863323,
+        "dead_ball_inbound": 1.0,
+        "jump_ball": 1.0
+      },
+      "end_counts": {
+        "defensive_rebound": 10931,
+        "made_shot": 11326,
+        "shooting_foul": 2063,
+        "turnover": 2691,
+        "pass_turnover": 370,
+        "period_expired": 388
+      },
+      "historical_team_end_counts_per_game": {
+        "defensive_rebound": 53.34,
+        "made_shot": 57.88,
+        "shooting_foul": 10.23,
+        "turnover": 13.84,
+        "pass_turnover": 1.93,
+        "period_expired": 1.86
+      },
+      "live_seconds_per_game": {
+        "setup": 1659.4813619710103,
+        "completed_pass": 385.4879743272754,
+        "release": 693.7463194471609,
+        "rebound_gather": 142.9626508538946,
+        "period": 1.321693400657904
+      },
+      "live_seconds_share": {
+        "setup": 0.5756092133094036,
+        "completed_pass": 0.13371070909721663,
+        "release": 0.2406334788231568,
+        "rebound_gather": 0.04958815499614798,
+        "period": 0.00045844377407488877
+      },
+      "clock_gap_max_abs": 9.094947017729282e-13,
+      "passes": {
+        "count": 27769,
+        "mean": 0.6099607475962404,
+        "p10": 0.0,
+        "p50": 0.0,
+        "p90": 2.0
+      },
+      "post_setup_seconds": {
+        "count": 27769,
+        "mean": 4.40605941167845,
+        "p10": 7.629452625224084e-14,
+        "p50": 3.7866775751626847,
+        "p90": 8.312150691151125
+      },
+      "zero_pass_shot_share": 0.5644736842105263,
+      "instant_turnover_share": 0.08631927689149771,
+      "pass_turnovers_per_game": 3.7,
+      "stolen_passes_with_no_added_time_per_game": 3.32,
+      "release_shot_clock_remaining_after_charge": {
+        "count": 27694,
+        "mean": 14.780507259886036,
+        "p10": 11.439719339336033,
+        "p50": 14.93169741006557,
+        "p90": 16.670256027357333
+      },
+      "period_ending_possessions_per_game": 4.01,
+      "period_ending_duration": {
+        "count": 401,
+        "mean": 5.892540614779889,
+        "p10": 0.9679882732089027,
+        "p50": 5.275021939145063,
+        "p90": 11.303833099502754
+      },
+      "shot_clock_violations_per_game": 0.0,
+      "oreb_possession_share": 0.1086103208613922,
+      "continuation_after_first_rebound_stamp": {
+        "count": 3016,
+        "mean": 4.474079402961995,
+        "p10": 1.5159220801426727,
+        "p50": 3.7826225267649534,
+        "p90": 8.472446465468238
+      },
+      "scorebook_estimate_per_game": 137.84040000000002,
+      "engine_possessions_minus_scorebook": 1.2395999999999958,
+      "shooting": {
+        "fg": 0.4522228299085866,
+        "three": 0.3727324804277258,
+        "ft": 0.8227899432278994
+      },
+      "star": {
+        "id": "NBA_201939",
+        "points_per_game": 58.5,
+        "shot_share": 0.33643253379170246
+      }
+    }
+  ],
+  "observed_2015_16_exploration": {
+    "games": 4,
+    "role": "exploration",
+    "validation_games_read": false,
+    "reserved_games_read": false,
+    "bulls_1995_96_timestamps_used": false,
+    "skipped_game_ids": [],
+    "duration": {
+      "count": 676,
+      "mean": 14.234763313609468,
+      "p10": 6.0,
+      "p50": 14.0,
+      "p90": 23.0
+    },
+    "buckets": {
+      "0-6": 0.1227810650887574,
+      "6-10": 0.20710059171597633,
+      "10-16": 0.3224852071005917,
+      "16-24": 0.26627218934911245,
+      "24+": 0.08136094674556213
+    }
+  },
+  "benchmarks": {
+    "bulls_1995_96_basketball_reference_pace_factor": 91.1,
+    "warriors_2015_16_basketball_reference_pace_factor": 99.3,
+    "warriors_2015_16_nba_com_pace": 100.24,
+    "warriors_2015_16_nba_com_possessions": 8303,
+    "warriors_2015_16_nba_com_possessions_per_game": 101.2560975609756,
+    "bulls_nba_com_pace": null,
+    "note": "Pace factors are external benchmarks. They are not inputs to the possession loop."
+  }
+}

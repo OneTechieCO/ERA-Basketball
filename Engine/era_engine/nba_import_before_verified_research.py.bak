@@ -1,0 +1,41 @@
+"""Optional server-side NBA research fetcher; never bundled or invoked by game clients.
+
+Use ONLY with permission to access and reuse NBA data in the intended product.
+Requires: pip install nba_api pandas requests
+Usage: python -m era_engine.nba_import research.db 201939
+"""
+import argparse
+import json
+from .storage import connect, create_research_schema
+
+
+def import_player_seasons(db_path: str, nba_player_id: int) -> int:
+    try:
+        from nba_api.stats.endpoints import playercareerstats
+    except ImportError as exc:
+        raise RuntimeError('Install optional research package: pip install nba_api pandas requests') from exc
+    con = connect(db_path)
+    create_research_schema(con)
+    # Requests can be blocked or rate-limited; failures are intentional errors, no fabricated fallback.
+    data = playercareerstats.PlayerCareerStats(player_id=nba_player_id, timeout=30)
+    df = data.season_totals_regular_season.get_data_frame()
+    count = 0
+    for record in df.to_dict(orient='records'):
+        season = str(record['SEASON_ID'])
+        con.execute('INSERT OR REPLACE INTO nba_season_research(nba_player_id,season_id,source,stats_json) VALUES(?,?,?,?)',
+                    (nba_player_id, season, 'nba.com via nba_api', json.dumps(record, default=str, allow_nan=False)))
+        count += 1
+    con.commit()
+    con.close()
+    return count
+
+
+def main():
+    p = argparse.ArgumentParser(description='Research-only NBA career season importer; permission required')
+    p.add_argument('db')
+    p.add_argument('nba_player_id', type=int)
+    args = p.parse_args()
+    print('Imported season rows:', import_player_seasons(args.db, args.nba_player_id))
+
+if __name__ == '__main__':
+    main()

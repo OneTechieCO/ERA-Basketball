@@ -1,0 +1,101 @@
+{
+  "description": "Live engine after the shot clock and before multiple-pass possessions. 82 games, seed 7, fictional demo rosters.",
+  "seed": 7,
+  "games": 82,
+  "teams": [
+    "Bay City Legends",
+    "Chicago Stampede"
+  ],
+  "eras": {
+    "1985-86": {
+      "team_per_game": [
+        {
+          "pts": 100.7683,
+          "ast": 7.378,
+          "tov": 10.6829,
+          "fga": 93.8902,
+          "violations": 0.0
+        },
+        {
+          "pts": 103.5366,
+          "ast": 7.4878,
+          "tov": 9.5,
+          "fga": 95.2439,
+          "violations": 0.0
+        }
+      ]
+    },
+    "1995-96": {
+      "team_per_game": [
+        {
+          "pts": 90.6829,
+          "ast": 6.3659,
+          "tov": 9.4634,
+          "fga": 85.6098,
+          "violations": 0.0
+        },
+        {
+          "pts": 92.7195,
+          "ast": 6.7683,
+          "tov": 8.5854,
+          "fga": 85.7805,
+          "violations": 0.0
+        }
+      ]
+    },
+    "2005-06": {
+      "team_per_game": [
+        {
+          "pts": 92.6829,
+          "ast": 6.4024,
+          "tov": 9.2317,
+          "fga": 86.6098,
+          "violations": 0.0
+        },
+        {
+          "pts": 93.6585,
+          "ast": 7.0732,
+          "tov": 8.4756,
+          "fga": 85.6951,
+          "violations": 0.0
+        }
+      ]
+    },
+    "2015-16": {
+      "team_per_game": [
+        {
+          "pts": 99.0,
+          "ast": 6.6585,
+          "tov": 9.9268,
+          "fga": 91.8049,
+          "violations": 0.0
+        },
+        {
+          "pts": 101.122,
+          "ast": 7.622,
+          "tov": 9.2805,
+          "fga": 92.5488,
+          "violations": 0.0
+        }
+      ]
+    },
+    "2023-24": {
+      "team_per_game": [
+        {
+          "pts": 102.8293,
+          "ast": 6.9512,
+          "tov": 10.4024,
+          "fga": 94.8293,
+          "violations": 0.0
+        },
+        {
+          "pts": 104.3415,
+          "ast": 7.9146,
+          "tov": 9.561,
+          "fga": 95.8902,
+          "violations": 0.0
+        }
+      ]
+    }
+  }
+}

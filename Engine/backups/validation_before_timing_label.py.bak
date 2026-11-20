@@ -1,0 +1,761 @@
+"""Deterministic reliability checks for the live V1 engine.
+
+simulate_series stays capped at 82 games. Larger workloads call simulate_game
+once per recorded seed. This module does not change play, ratings, or timing.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import platform
+import resource
+import sqlite3
+import sys
+import time
+import tracemalloc
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+from .core import (
+    OVERTIME_PERIOD_SECONDS,
+    Era,
+    Team,
+    TimingAssumptions,
+    UnresolvedGameError,
+    offensive_rebound_reset,
+    simulate_game,
+)
+from .historical_players import TEAM_ENDPOINT, connect_research, load_researched_rosters
+from .playbyplay_timing import shot_trip_duration_sample
+from .seed import ERAS, demo_players
+
+SERIES_GAME_LIMIT = 82
+CHECKPOINTS = (1, 10, 100, 1000)
+CROSS_ERA_GAMES = 10
+COUNTING = ("pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "fga", "fgm", "fg3a", "fg3m", "fta", "ftm", "pf")
+TURNOVER_EVENTS = ("turnover", "pass_turnover", "shot_clock_violation")
+MODEL_VERSION = "0.1.0-prototype"
+
+
+def batch_seeds(games: int, start: int = 0) -> list[int]:
+    """Recorded per-game seeds. Game i uses start + i, with no other offset."""
+    if games < 1:
+        raise ValueError("a batch needs at least one game")
+    return list(range(start, start + games))
+
+
+def checkpoints_for(games: int, checkpoints: tuple[int, ...] = CHECKPOINTS) -> tuple[int, ...]:
+    selected = tuple(size for size in checkpoints if 1 <= size <= games)
+    if not selected or selected[-1] != games:
+        if games not in selected:
+            selected = tuple(sorted({*selected, games}))
+    return selected
+
+
+def _finite_nonnegative(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= -1e-9
+
+
+def check_game(game: dict[str, Any], era: Era, team_a_ids: tuple[str, ...], team_b_ids: tuple[str, ...]) -> list[str]:
+    """Return correctness failures for one completed game. An empty list passed."""
+    issues: list[str] = []
+    score = list(game.get("score", []))
+    if game.get("status") != "final" or game.get("completed") is not True:
+        issues.append("game is not a completed final")
+    if len(score) != 2 or score[0] == score[1]:
+        issues.append("completed game has no winner")
+    quarter = era.game_minutes * 60 / 4
+    lengths = game.get("quarter_lengths")
+    if lengths != [quarter] * 4 and not (
+        isinstance(lengths, list) and len(lengths) == 4 and all(abs(length - quarter) <= 1e-6 for length in lengths)
+    ):
+        issues.append("regulation is not four equal quarters")
+    if game.get("quarters_completed") != 4:
+        issues.append("regulation did not complete four quarters")
+    if abs(float(game.get("regulation_seconds", -1)) - era.game_minutes * 60) > 1e-6:
+        issues.append("regulation length does not match the era")
+    overtime = int(game.get("overtime", {}).get("periods", -1))
+    expected_clock = era.game_minutes * 60 + OVERTIME_PERIOD_SECONDS * overtime
+    if abs(float(game.get("game_clock_seconds", -1)) - expected_clock) > 1e-6:
+        issues.append("clock is not regulation plus 300 seconds per overtime")
+    periods = game.get("period_scores", [])
+    if len(periods) != 4 + overtime:
+        issues.append("period log does not match regulation plus overtime")
+    else:
+        labels = [row.get("period") for row in periods]
+        if labels[:4] != ["Q1", "Q2", "Q3", "Q4"] or labels[4:] != [f"OT{index}" for index in range(1, overtime + 1)]:
+            issues.append("period labels are not four quarters followed by overtime")
+        for index, row in enumerate(periods):
+            expected = OVERTIME_PERIOD_SECONDS if index >= 4 else quarter
+            if abs(float(row.get("seconds", -1)) - expected) > 1e-6:
+                issues.append("a period does not have its required length")
+                break
+    regulation_score = list(game.get("regulation_score", []))
+    if len(regulation_score) != 2:
+        issues.append("regulation score is missing")
+    elif overtime > 0 and regulation_score[0] != regulation_score[1]:
+        issues.append("overtime started from an untied regulation score")
+    elif overtime > 0 and regulation_score == score:
+        issues.append("overtime ended without separating a tied score")
+    elif overtime == 0 and regulation_score != score:
+        issues.append("a regulation finish does not keep the regulation score")
+    if game.get("overtime", {}).get("tie_broken_by_rule") or game.get("overtime", {}).get("fixture_points"):
+        issues.append("a tie was closed by a fixture or an invented point")
+    if abs(sum(game.get("live_seconds", {}).values()) - float(game.get("game_clock_seconds", 0))) > 1e-6:
+        issues.append("live seconds do not add up to the game clock")
+
+    events = game.get("events")
+    if not events:
+        issues.append("event log is missing, so lineup and shot-clock checks did not run")
+        events = []
+    reset_rule = offensive_rebound_reset(era)
+    rosters = (set(team_a_ids), set(team_b_ids))
+    misses = 0
+    turnover_events = 0
+    for event in events:
+        for field in ("shot_clock_remaining", "quarter_remaining", "elapsed_seconds"):
+            if not _finite_nonnegative(event.get(field)):
+                issues.append(f"{field} is negative or invalid")
+                break
+        remaining = event.get("shot_clock_remaining")
+        if isinstance(remaining, (int, float)) and remaining > era.shot_clock + 1e-6:
+            issues.append("shot clock exceeds the era limit")
+        offense = event.get("offense_lineup")
+        defense = event.get("defense_lineup")
+        if not isinstance(offense, list) or not isinstance(defense, list):
+            issues.append("a possession has no lineup")
+            continue
+        if len(offense) != 5 or len(set(offense)) != 5 or len(defense) != 5 or len(set(defense)) != 5:
+            issues.append("a lineup does not have five distinct players")
+        off, deff = set(offense), set(defense)
+        if off & deff or not ((off <= rosters[0] and deff <= rosters[1]) or (off <= rosters[1] and deff <= rosters[0])):
+            issues.append("a lineup is off the roster or shares a player")
+        actor = event.get("offense")
+        if actor is not None and actor not in off:
+            issues.append("an off-court player is credited on offense")
+        defender = event.get("defender")
+        if defender is not None and defender not in deff:
+            issues.append("an off-court player is credited on defense")
+        assister = event.get("assister")
+        if assister is not None and assister not in off:
+            issues.append("an off-court player is credited with an assist")
+        if event.get("kind") == "miss":
+            misses += 1
+            rebounder = event.get("rebounder")
+            board = off if event.get("offensive_rebound") else deff
+            if rebounder not in board:
+                issues.append("a rebound is credited off the court")
+            if event.get("offensive_rebound") and event.get("shot_clock_reset") != reset_rule:
+                issues.append("offensive-rebound reset does not follow the era rule")
+        if event.get("kind") in TURNOVER_EVENTS:
+            turnover_events += 1
+        if len(issues) > 24:
+            issues.append("further event failures omitted")
+            break
+
+    stats = game.get("player_stats", {})
+    if set(stats) != set(team_a_ids) | set(team_b_ids):
+        issues.append("player stat rows do not match the two rosters")
+    points = [0, 0]
+    attempts = {"fga": 0, "fgm": 0, "fg3a": 0, "fg3m": 0}
+    rebounds = 0
+    turnovers = 0
+    steals = 0
+    for index, ids in enumerate((team_a_ids, team_b_ids)):
+        minutes = 0.0
+        for pid in ids:
+            row = stats.get(pid, {})
+            fga = row.get("fga", 0)
+            fgm = row.get("fgm", 0)
+            fg3a = row.get("fg3a", 0)
+            fg3m = row.get("fg3m", 0)
+            fta = row.get("fta", 0)
+            ftm = row.get("ftm", 0)
+            if fgm > fga or fg3m > fg3a or fg3a > fga or fg3m > fgm or ftm > fta:
+                issues.append("makes exceed attempts")
+            if row.get("reb", 0) != row.get("oreb", 0) + row.get("dreb", 0):
+                issues.append("rebounds do not equal offensive plus defensive")
+            line = 2 * (fgm - fg3m) + 3 * fg3m + ftm
+            if line != row.get("pts", 0):
+                issues.append("points do not match the made shots and free throws")
+            if row.get("min", 0) <= 1e-9:
+                if any(row.get(stat, 0) for stat in COUNTING):
+                    issues.append("a player with no court time has a live statistic")
+            elif row.get("gp") != 1:
+                issues.append("a player who took the court is not marked active")
+            minutes += row.get("min", 0.0)
+            points[index] += row.get("pts", 0)
+            for key in attempts:
+                attempts[key] += row.get(key, 0)
+            rebounds += row.get("reb", 0)
+            turnovers += row.get("tov", 0)
+            steals += row.get("stl", 0)
+        if points[index] != score[index]:
+            issues.append("player points do not sum to the team score")
+        if abs(minutes * 60.0 - 5.0 * float(game.get("game_clock_seconds", 0))) > 1e-3:
+            issues.append("player court time is not five times the elapsed clock")
+    if attempts["fga"] - attempts["fgm"] != rebounds or misses != rebounds:
+        issues.append("rebounds do not account for every missed field goal")
+    if turnover_events != turnovers:
+        issues.append("turnovers do not match the turnover events")
+    if steals > turnovers:
+        issues.append("steals exceed turnovers")
+    return issues
+
+
+def _percentile(values: list[float], fraction: float) -> float:
+    if len(values) == 1:
+        return values[0]
+    position = fraction * (len(values) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(values) - 1)
+    weight = position - lower
+    return values[lower] * (1.0 - weight) + values[upper] * weight
+
+
+class Sample:
+    """Monte Carlo sample. The interval is simulation noise, not a real-world interval."""
+
+    def __init__(self) -> None:
+        self.values: list[float] = []
+
+    def add(self, value: float) -> None:
+        self.values.append(float(value))
+
+    def summary(self) -> dict[str, Any] | None:
+        count = len(self.values)
+        if count == 0:
+            return None
+        mean = sum(self.values) / count
+        ordered = sorted(self.values)
+        report = {
+            "n": count,
+            "mean": mean,
+            "p10": _percentile(ordered, 0.10),
+            "p50": _percentile(ordered, 0.50),
+            "p90": _percentile(ordered, 0.90),
+        }
+        if count < 2:
+            report["sd"] = None
+            report["ci95"] = None
+            return report
+        variance = sum((value - mean) ** 2 for value in self.values) / (count - 1)
+        deviation = math.sqrt(variance)
+        error = deviation / math.sqrt(count)
+        report["sd"] = deviation
+        report["ci95"] = [mean - 1.96 * error, mean + 1.96 * error]
+        return report
+
+
+def _rate(made: float, attempts: float) -> float | None:
+    if attempts <= 0:
+        return None
+    return made / attempts
+
+
+def _outside(interval: list[float] | None, value: float | None) -> bool | None:
+    if interval is None or value is None:
+        return None
+    return value < interval[0] or value > interval[1]
+
+
+@dataclass
+class Matchup:
+    name: str
+    label: str
+    team_a: Team
+    team_b: Team
+    players: dict[str, Any]
+    era: Era
+    timing: TimingAssumptions | None = None
+    rotation_targets: tuple[dict[str, float] | None, dict[str, float] | None] | None = None
+    historical_roster: Any = None
+    hypothetical: bool = False
+
+
+def _fingerprint(game: dict[str, Any]) -> tuple:
+    rows = []
+    for pid in sorted(game["player_stats"]):
+        row = game["player_stats"][pid]
+        rows.append((pid, row.get("pts", 0), row.get("fga", 0), row.get("fgm", 0), row.get("fta", 0), row.get("ftm", 0), row.get("reb", 0), row.get("ast", 0), row.get("tov", 0), row.get("min")))
+    return (tuple(game["score"]), tuple(game["possessions_by_team"]), game["game_clock_seconds"], game["overtime"]["periods"], tuple(rows))
+
+
+def _team_box(game: dict[str, Any], ids: tuple[str, ...]) -> dict[str, float]:
+    box = {stat: 0.0 for stat in (*COUNTING, "min")}
+    for pid in ids:
+        row = game["player_stats"][pid]
+        for stat in box:
+            box[stat] += row.get(stat, 0)
+    return box
+
+
+def _player_report(pid: str, players: dict, box: dict[str, Sample], pooled: dict[str, float], team_fga: float, roster: Any) -> dict[str, Any]:
+    profile = None if roster is None else next((item for item in roster.profiles if item.player.player_id == pid), None)
+    share = None if team_fga <= 0 else pooled["fga"] / team_fga
+    historical_share = None if profile is None else profile.calculated["fga_share"]
+    points = box["pts"].summary()
+    report = {
+        "player_id": pid,
+        "player": players[pid].name,
+        "minutes": box["min"].summary(),
+        "points": points,
+        "fga_per_game": box["fga"].summary(),
+        "fga_share": share,
+        "fga_share_games": box["share"].summary(),
+        "assists": box["ast"].summary(),
+        "turnovers": box["tov"].summary(),
+    }
+    if profile is not None:
+        report["stored_season"] = {
+            "source": "playercareerstats team stint",
+            "games": profile.counting["games"],
+            "minutes_per_game": profile.calculated["minutes_per_game"],
+            "points_per_game": profile.calculated["points_per_game"],
+            "fga_per_game": profile.calculated["fga_per_game"],
+            "fga_per_36": profile.calculated["fga_per_36"],
+            "fga_share": historical_share,
+            "assists_per_game": profile.calculated["assists_per_game"],
+            "turnovers_per_game": profile.calculated["turnovers_per_game"],
+        }
+        report["stored_rate_outside_sampling_interval"] = {
+            "minutes": _outside(report["minutes"]["ci95"] if report["minutes"] else None, profile.calculated["minutes_per_game"]),
+            "points": _outside(points["ci95"] if points else None, profile.calculated["points_per_game"]),
+            "fga_share": _outside(report["fga_share_games"]["ci95"] if report["fga_share_games"] else None, historical_share),
+        }
+    return report
+
+
+def run_workload(matchup: Matchup, games: int, *, checkpoints: tuple[int, ...] = CHECKPOINTS, replay: bool = True, simulate: Callable = simulate_game) -> dict[str, Any]:
+    """Play recorded seeds, check every game, and summarize the requested sizes."""
+    seeds = batch_seeds(games)
+    marks = checkpoints_for(games, checkpoints)
+    team_samples = {name: Sample() for name in ("points", "opponent_points", "differential", "possessions_per_48", "points_per_possession", "fg_pct", "two_pct", "three_pct", "ft_pct", "fga", "fta", "oreb", "dreb", "ast", "stl", "blk", "tov")}
+    roster_ids = (matchup.team_a.player_ids, matchup.team_b.player_ids)
+    player_samples = {
+        pid: {name: Sample() for name in ("min", "pts", "fga", "share", "ast", "tov")}
+        for ids in roster_ids for pid in ids
+    }
+    pooled = {pid: {stat: 0.0 for stat in ("pts", "fga", "fgm", "fg3a", "fg3m", "fta", "ftm", "min", "ast", "tov")} for ids in roster_ids for pid in ids}
+    team_pooled = {stat: 0.0 for stat in ("pts", "opp", "fga", "fgm", "fg3a", "fg3m", "fta", "ftm", "oreb", "dreb", "ast", "stl", "blk", "tov", "possessions", "clock_minutes")}
+    failures: list[dict[str, Any]] = []
+    completed = 0
+    incomplete = 0
+    errors = 0
+    overtime_games = 0
+    wins = 0
+    fingerprints: dict[int, tuple] = {}
+    simulate_seconds = 0.0
+    check_seconds = 0.0
+    example_bytes = None
+    example_events = None
+    snapshots: dict[int, dict[str, Any]] = {}
+    started = time.perf_counter()
+    for seed in seeds:
+        try:
+            tick = time.perf_counter()
+            game = simulate(
+                matchup.team_a, matchup.team_b, matchup.players, matchup.era, seed,
+                track_events=True, timing=matchup.timing, rotation_targets=matchup.rotation_targets,
+            )
+            simulate_seconds += time.perf_counter() - tick
+        except UnresolvedGameError as exc:
+            incomplete += 1
+            if len(failures) < 12:
+                failures.append({"seed": seed, "status": "incomplete", "detail": str(exc)})
+            continue
+        except Exception as exc:
+            errors += 1
+            if len(failures) < 12:
+                failures.append({"seed": seed, "status": "error", "detail": f"{type(exc).__name__}: {exc}"})
+            continue
+        tick = time.perf_counter()
+        issues = check_game(game, matchup.era, matchup.team_a.player_ids, matchup.team_b.player_ids)
+        check_seconds += time.perf_counter() - tick
+        if issues:
+            errors += 1
+            if len(failures) < 12:
+                failures.append({"seed": seed, "status": "check", "detail": issues[:8]})
+            continue
+        completed += 1
+        if game["overtime"]["periods"]:
+            overtime_games += 1
+        if game["score"][0] > game["score"][1]:
+            wins += 1
+        fingerprints[seed] = _fingerprint(game)
+        if example_bytes is None:
+            example_events = len(game["events"])
+            example_bytes = len(json.dumps(game).encode())
+        clock_minutes = game["game_clock_seconds"] / 60.0
+        box = _team_box(game, matchup.team_a.player_ids)
+        opponent = _team_box(game, matchup.team_b.player_ids)
+        possessions = game["possessions_by_team"][0]
+        team_samples["points"].add(box["pts"])
+        team_samples["opponent_points"].add(opponent["pts"])
+        team_samples["differential"].add(box["pts"] - opponent["pts"])
+        team_samples["possessions_per_48"].add(possessions / clock_minutes * 48.0)
+        if possessions > 0:
+            team_samples["points_per_possession"].add(box["pts"] / possessions)
+        if box["fga"] > 0:
+            team_samples["fg_pct"].add(box["fgm"] / box["fga"])
+        if box["fga"] > box["fg3a"]:
+            team_samples["two_pct"].add((box["fgm"] - box["fg3m"]) / (box["fga"] - box["fg3a"]))
+        if box["fg3a"] > 0:
+            team_samples["three_pct"].add(box["fg3m"] / box["fg3a"])
+        if box["fta"] > 0:
+            team_samples["ft_pct"].add(box["ftm"] / box["fta"])
+        for stat in ("fga", "fta", "oreb", "dreb", "ast", "stl", "blk", "tov"):
+            team_samples[stat].add(box[stat])
+        for stat, value in (("pts", box["pts"]), ("opp", opponent["pts"]), ("fga", box["fga"]), ("fgm", box["fgm"]), ("fg3a", box["fg3a"]), ("fg3m", box["fg3m"]), ("fta", box["fta"]), ("ftm", box["ftm"]), ("oreb", box["oreb"]), ("dreb", box["dreb"]), ("ast", box["ast"]), ("stl", box["stl"]), ("blk", box["blk"]), ("tov", box["tov"])):
+            team_pooled[stat] += value
+        team_pooled["possessions"] += possessions
+        team_pooled["clock_minutes"] += clock_minutes
+        for ids, team_box in ((matchup.team_a.player_ids, box), (matchup.team_b.player_ids, opponent)):
+            for pid in ids:
+                row = game["player_stats"][pid]
+                player_samples[pid]["min"].add(row.get("min", 0.0))
+                player_samples[pid]["pts"].add(row.get("pts", 0))
+                player_samples[pid]["fga"].add(row.get("fga", 0))
+                player_samples[pid]["share"].add(0.0 if team_box["fga"] == 0 else row.get("fga", 0) / team_box["fga"])
+                player_samples[pid]["ast"].add(row.get("ast", 0))
+                player_samples[pid]["tov"].add(row.get("tov", 0))
+                for stat in pooled[pid]:
+                    pooled[pid][stat] += row.get(stat, 0)
+        if completed in marks:
+            elapsed = time.perf_counter() - started
+            snapshots[completed] = _snapshot(matchup, team_samples, player_samples, pooled, team_pooled, completed, incomplete, errors, overtime_games, wins, elapsed, simulate_seconds, check_seconds)
+    replay_mismatches = []
+    replay_seconds = 0.0
+    if replay:
+        tick = time.perf_counter()
+        for seed, expected in fingerprints.items():
+            again = simulate(
+                matchup.team_a, matchup.team_b, matchup.players, matchup.era, seed,
+                track_events=False, timing=matchup.timing, rotation_targets=matchup.rotation_targets,
+            )
+            if _fingerprint(again) != expected:
+                replay_mismatches.append(seed)
+                if len(replay_mismatches) >= 8:
+                    break
+        replay_seconds = time.perf_counter() - tick
+    elapsed = time.perf_counter() - started
+    return {
+        "name": matchup.name,
+        "label": matchup.label,
+        "hypothetical": matchup.hypothetical,
+        "era": matchup.era.key,
+        "teams": [matchup.team_a.name, matchup.team_b.name],
+        "timing_mode": "original" if matchup.timing is None or matchup.timing.first_trip_targets is None else "first_trip_residual",
+        "seeds": {"start": seeds[0], "step": 1, "count": len(seeds)},
+        "games_requested": games,
+        "games_completed": completed,
+        "games_incomplete": incomplete,
+        "games_failed_checks_or_errors": errors,
+        "overtime_games": overtime_games,
+        "team_a_wins": wins,
+        "replay": {"compared": len(fingerprints) if replay else 0, "mismatches": replay_mismatches, "seconds": replay_seconds},
+        "runtime": {
+            "seconds": elapsed,
+            "simulate_seconds": simulate_seconds,
+            "check_seconds": check_seconds,
+            "seconds_per_completed_game": None if completed == 0 else simulate_seconds / completed,
+            "process_rss_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+            "rss_unit": "bytes on darwin; this is the process high-water mark, not a per-game allocation",
+        },
+        "result_size": {
+            "one_game_event_log_bytes": example_bytes,
+            "one_game_events": example_events,
+            "thousand_game_event_logs_extrapolated_bytes": None if example_bytes is None else example_bytes * 1000,
+            "event_logs_retained": False,
+        },
+        "checkpoints": {str(size): snapshots[size] for size in marks if size in snapshots},
+        "failure_examples": failures,
+    }
+
+
+def _snapshot(matchup: Matchup, team_samples: dict[str, Sample], player_samples: dict, pooled: dict, team_pooled: dict, completed: int, incomplete: int, errors: int, overtime_games: int, wins: int, elapsed: float, simulate_seconds: float, check_seconds: float) -> dict[str, Any]:
+    def side_players(ids, roster):
+        team_fga = sum(pooled[pid]["fga"] for pid in ids)
+        return [
+            _player_report(pid, matchup.players, player_samples[pid], pooled[pid], team_fga, roster)
+            for pid in ids
+        ]
+    players = {
+        "team_a": side_players(matchup.team_a.player_ids, matchup.historical_roster),
+        "team_b": side_players(matchup.team_b.player_ids, None),
+    }
+    two_made = team_pooled["fgm"] - team_pooled["fg3m"]
+    two_attempts = team_pooled["fga"] - team_pooled["fg3a"]
+    return {
+        "games_completed": completed,
+        "games_incomplete": incomplete,
+        "games_failed_checks_or_errors": errors,
+        "overtime_games": overtime_games,
+        "team_a_wins": wins,
+        "runtime_seconds": elapsed,
+        "simulate_seconds": simulate_seconds,
+        "check_seconds": check_seconds,
+        "seconds_per_completed_game": None if completed == 0 else simulate_seconds / completed,
+        "team": {name: sample.summary() for name, sample in team_samples.items()},
+        "pooled": {
+            "fg_pct": _rate(team_pooled["fgm"], team_pooled["fga"]),
+            "two_pct": _rate(two_made, two_attempts),
+            "three_pct": _rate(team_pooled["fg3m"], team_pooled["fg3a"]),
+            "ft_pct": _rate(team_pooled["ftm"], team_pooled["fta"]),
+            "points_per_possession": _rate(team_pooled["pts"], team_pooled["possessions"]),
+            "possessions_per_48": None if team_pooled["clock_minutes"] == 0 else team_pooled["possessions"] / team_pooled["clock_minutes"] * 48.0,
+            "points_per_game": team_pooled["pts"] / completed,
+            "fga_per_game": team_pooled["fga"] / completed,
+            "fta_per_game": team_pooled["fta"] / completed,
+            "oreb_per_game": team_pooled["oreb"] / completed,
+            "dreb_per_game": team_pooled["dreb"] / completed,
+            "ast_per_game": team_pooled["ast"] / completed,
+            "stl_per_game": team_pooled["stl"] / completed,
+            "blk_per_game": team_pooled["blk"] / completed,
+            "tov_per_game": team_pooled["tov"] / completed,
+        },
+        "players": players,
+    }
+
+
+def stored_team_reference(roster) -> dict[str, Any]:
+    """Stored season totals. Pace stays on its own row and is not combined with attempts."""
+    connection = connect_research()
+    connection.row_factory = sqlite3.Row
+    try:
+        counting = connection.execute(
+            """SELECT * FROM nba_team_season_research
+               WHERE season_id=? AND team_id=? AND endpoint=?""",
+            (roster.season_id, roster.team_id, TEAM_ENDPOINT),
+        ).fetchone()
+        dash_rows = connection.execute(
+            """SELECT pace, pace_measure, possessions, possessions_measure, fga, points
+               FROM nba_team_season_research
+               WHERE season_id=? AND team_id=? AND endpoint='leaguedashteamstats'""",
+            (roster.season_id, roster.team_id),
+        ).fetchall()
+    finally:
+        connection.close()
+    games = float(counting["games"])
+    per_game = {
+        field: None if counting[field] is None else float(counting[field]) / games
+        for field in ("points", "fgm", "fga", "fg3m", "fg3a", "ftm", "fta", "assists", "offensive_rebounds", "defensive_rebounds", "steals", "blocks", "turnovers")
+    }
+    dash = [dict(row) for row in dash_rows]
+    same_row_possessions = any(row["fga"] is not None and row["possessions"] is not None for row in dash)
+    return {
+        "season_id": roster.season_id,
+        "team": roster.team_name,
+        "counting_source": TEAM_ENDPOINT,
+        "team_games": games,
+        "per_game": per_game,
+        "fg_pct": _rate(counting["fgm"], counting["fga"]),
+        "two_pct": _rate(counting["fgm"] - counting["fg3m"], counting["fga"] - counting["fg3a"]),
+        "three_pct": _rate(counting["fg3m"], counting["fg3a"]),
+        "ft_pct": _rate(counting["ftm"], counting["fta"]),
+        "dash_rows": dash,
+        "possessions_and_fga_on_same_row": same_row_possessions,
+        "turnover_gap_team_minus_players": roster.audit["turnover_gap"],
+        "note": "Stored season totals. A dash pace row is not combined with the counting row. A fictional opponent is not a replay.",
+    }
+
+
+def _compare_team(reference: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    pooled = snapshot["pooled"]
+    team = snapshot["team"]
+    pairs = {
+        "points_per_game": (reference["per_game"]["points"], pooled["points_per_game"], team["points"]["ci95"]),
+        "fga_per_game": (reference["per_game"]["fga"], pooled["fga_per_game"], team["fga"]["ci95"]),
+        "fta_per_game": (reference["per_game"]["fta"], pooled["fta_per_game"], team["fta"]["ci95"]),
+        "oreb_per_game": (reference["per_game"]["offensive_rebounds"], pooled["oreb_per_game"], team["oreb"]["ci95"]),
+        "dreb_per_game": (reference["per_game"]["defensive_rebounds"], pooled["dreb_per_game"], team["dreb"]["ci95"]),
+        "ast_per_game": (reference["per_game"]["assists"], pooled["ast_per_game"], team["ast"]["ci95"]),
+        "stl_per_game": (reference["per_game"]["steals"], pooled["stl_per_game"], team["stl"]["ci95"]),
+        "blk_per_game": (reference["per_game"]["blocks"], pooled["blk_per_game"], team["blk"]["ci95"]),
+        "tov_per_game": (reference["per_game"]["turnovers"], pooled["tov_per_game"], team["tov"]["ci95"]),
+        "fg_pct": (reference["fg_pct"], pooled["fg_pct"], None if team["fg_pct"] is None else team["fg_pct"]["ci95"]),
+        "two_pct": (reference["two_pct"], pooled["two_pct"], None if team["two_pct"] is None else team["two_pct"]["ci95"]),
+        "three_pct": (reference["three_pct"], pooled["three_pct"], None if team["three_pct"] is None else team["three_pct"]["ci95"]),
+        "ft_pct": (reference["ft_pct"], pooled["ft_pct"], None if team["ft_pct"] is None else team["ft_pct"]["ci95"]),
+    }
+    rows = {}
+    for name, (stored, simulated, interval) in pairs.items():
+        rows[name] = {
+            "stored_season": stored,
+            "simulated": simulated,
+            "sampling_ci95": interval,
+            "stored_outside_sampling_interval": _outside(interval, stored),
+        }
+    return rows
+
+
+def demo_matchups() -> list[Matchup]:
+    players = {player.player_id: player for player in demo_players()}
+    bay = Team("Bay City Legends", tuple(f"ERA_{index:04d}" for index in range(1, 6)), "perimeter")
+    stampede = Team("Chicago Stampede", tuple(f"ERA_{index:04d}" for index in range(6, 11)), "balanced")
+    return [
+        Matchup(
+            name=f"demo_{era.key}",
+            label="Fictional demo rosters. Seeded era parameters are illustrative and do not set the possession count.",
+            team_a=bay,
+            team_b=stampede,
+            players=players,
+            era=era,
+        )
+        for era in ERAS
+    ]
+
+
+def historical_matchups(sample: tuple[float, ...]) -> list[Matchup]:
+    bulls, warriors = load_researched_rosters()
+    demo = {player.player_id: player for player in demo_players()}
+    bay = Team("Bay City Legends", tuple(f"ERA_{index:04d}" for index in range(1, 6)), "perimeter")
+    stampede = Team("Chicago Stampede", tuple(f"ERA_{index:04d}" for index in range(6, 11)), "balanced")
+    bulls_era = next(era for era in ERAS if era.key == bulls.era_key)
+    warriors_era = next(era for era in ERAS if era.key == warriors.era_key)
+    return [
+        Matchup(
+            name="warriors_2015_16",
+            label="2015-16 Warriors against fictional Chicago Stampede, with the optional 2015-16 first-trip sample. Not a historical replay.",
+            team_a=warriors.team,
+            team_b=stampede,
+            players={**demo, **warriors.players},
+            era=warriors_era,
+            timing=TimingAssumptions(first_trip_targets=sample),
+            rotation_targets=(dict(warriors.rotation_targets), None),
+            historical_roster=warriors,
+        ),
+        Matchup(
+            name="bulls_1995_96",
+            label="1995-96 Bulls against fictional Bay City, original timing only. The 2015-16 sample is not used. Not a historical replay.",
+            team_a=bulls.team,
+            team_b=bay,
+            players={**demo, **bulls.players},
+            era=bulls_era,
+            timing=None,
+            rotation_targets=(dict(bulls.rotation_targets), None),
+            historical_roster=bulls,
+        ),
+    ]
+
+
+def cross_era_matchups() -> list[Matchup]:
+    bulls, warriors = load_researched_rosters()
+    if set(bulls.players) & set(warriors.players):
+        raise RuntimeError("a player id is on both historical rosters")
+    players = {**bulls.players, **warriors.players}
+    rotations = (dict(bulls.rotation_targets), dict(warriors.rotation_targets))
+    matchups = []
+    for era in ERAS:
+        if era.key not in ("1995-96", "2015-16"):
+            continue
+        matchups.append(Matchup(
+            name=f"cross_era_{era.key}",
+            label=(
+                f"Hypothetical uncalibrated game in the {era.key} era environment. "
+                "Original timing for both environments. This is not evidence about which real team would win."
+            ),
+            team_a=bulls.team,
+            team_b=warriors.team,
+            players=players,
+            era=era,
+            timing=None,
+            rotation_targets=rotations,
+            hypothetical=True,
+        ))
+    return matchups
+
+
+def one_game_allocation(matchup: Matchup) -> dict[str, int]:
+    """Python heap for one checked game. Tracing stays off the batch loop."""
+    tracemalloc.start()
+    try:
+        game = simulate_game(
+            matchup.team_a, matchup.team_b, matchup.players, matchup.era, 0,
+            track_events=True, timing=matchup.timing, rotation_targets=matchup.rotation_targets,
+        )
+        current, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    return {"peak_bytes": peak, "retained_bytes": current, "events": len(game["events"])}
+
+
+def run_protocol(*, max_games: int = 1000, checkpoints: tuple[int, ...] = CHECKPOINTS, cross_era_games: int = CROSS_ERA_GAMES) -> dict[str, Any]:
+    if max_games < 1:
+        raise ValueError("max games must be positive")
+    sample = tuple(shot_trip_duration_sample()["durations"])
+    workloads = [*demo_matchups(), *historical_matchups(sample)]
+    allocation = one_game_allocation(workloads[0])
+    results = [run_workload(matchup, max_games, checkpoints=checkpoints) for matchup in workloads]
+    cross_games = min(cross_era_games, max_games)
+    cross = [run_workload(matchup, cross_games, checkpoints=(cross_games,)) for matchup in cross_era_matchups()]
+    comparisons = {}
+    for result, matchup in zip(results, workloads):
+        if matchup.historical_roster is None:
+            continue
+        if not result["checkpoints"]:
+            continue
+        largest = result["checkpoints"][str(max(int(size) for size in result["checkpoints"]))]
+        reference = stored_team_reference(matchup.historical_roster)
+        comparisons[matchup.name] = {
+            "label": "Stored season totals beside a fictional-opponent simulation. Sampling intervals describe Monte Carlo noise only.",
+            "stored": reference,
+            "simulated_vs_stored": _compare_team(reference, largest),
+            "era_pace_parameter_not_used": matchup.era.pace,
+            "simulated_possessions_per_48": largest["pooled"]["possessions_per_48"],
+        }
+    failed = sum(item["games_incomplete"] + item["games_failed_checks_or_errors"] + len(item["replay"]["mismatches"]) for item in [*results, *cross])
+    return {
+        "model_version": MODEL_VERSION,
+        "label": "V1 reliability and statistical measurement. Fictional and cross-era games are not historical replay validation.",
+        "host": {"platform": platform.platform(), "python": sys.version.split()[0]},
+        "series_contract": {
+            "function": "simulate_series",
+            "maximum_games": SERIES_GAME_LIMIT,
+            "preserved": True,
+            "batch_runner": "simulate_game once per recorded seed",
+        },
+        "seed_plan": "Each workload uses seeds 0, 1, 2, ... The same seed repeats the same game.",
+        "frozen_logic": "No player selection, shooting, timing, clock, rotation, or research-data change is made by this run.",
+        "workloads": results,
+        "cross_era": cross,
+        "historical_comparison": comparisons,
+        "one_game_python_heap": allocation,
+        "functional_failures": failed,
+        "iphone": {
+            "python_simulation_runs_on_device": False,
+            "later_work_not_in_this_step": [
+                "A batch request that accepts an arbitrary seed list. simulate_series remains capped at 82.",
+                "A compact result schema the app can store without play-by-play.",
+                "An on-device or server runtime. This measurement is CPython on the development machine.",
+            ],
+        },
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run deterministic V1 reliability batches")
+    parser.add_argument("--max-games", type=int, default=1000)
+    parser.add_argument("--output", default="validation/v1_reliability.json")
+    parser.add_argument("--cross-era-games", type=int, default=CROSS_ERA_GAMES)
+    args = parser.parse_args(argv)
+    report = run_protocol(max_games=args.max_games, cross_era_games=args.cross_era_games)
+    destination = Path(args.output)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(json.dumps(report, indent=2).encode())
+    print(json.dumps({
+        "output": str(destination),
+        "bytes": destination.stat().st_size,
+        "functional_failures": report["functional_failures"],
+        "workloads": [
+            {"name": item["name"], "completed": item["games_completed"], "failed": item["games_incomplete"] + item["games_failed_checks_or_errors"], "replay_mismatches": len(item["replay"]["mismatches"]), "seconds": round(item["runtime"]["seconds"], 3)}
+            for item in [*report["workloads"], *report["cross_era"]]
+        ],
+    }, indent=2))
+    return 1 if report["functional_failures"] else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
